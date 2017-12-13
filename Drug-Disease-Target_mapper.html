@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>_-"Hyp.Thyroïde.Jip"-_</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+  <!-- ops.js -->
+  <script src="lib/jquery-3.2.1.js"></script>
+  <script type="text/javascript" src="lib/purl.js"></script>
+  <script type="text/javascript" src="src/combined.js"></script>\
+
+  <!-- d3.js -->
+  <script src="lib/d3.v3.min.js" charset="utf-8"></script>
+
+  <style>
+    div {
+      font-family: "Courier New", monospace;
+      white-space: pre;
+    }
+  </style>
+</head>
+
+<body>
+
+    <h1>Force Tutorial</h1>
+    <canvas id="network" width="1200" height="800"></canvas>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+
+  <h3>Disease/drug target mapper</h3>
+  <p>This is a network showing the overlap between targets of Coronary heart disease and its accompanying drug Lipitor</p>
+  
+  <h4>The node you clicked is the following: </h4>
+  <div class="json" id="json1">Click on a node to see details.</div>
+<!--   <h4>JSON 2: Targets</h4>
+  <div class="json" id="json2">Pending...</div>
+  <h4>JSON 3: DrugTargets</h4>
+  <div class="json" id="json3">Pending...</div>
+  <h4>JSON 4: DrugMapping</h4>
+  <div class="json" id="json4">Pending...</div> 
+  <h4>JSON 5: DrugMapping</h4>
+  <div class="json" id="json5">Pending...</div> -->
+  
+
+  <!-- dynamically create a table with type information -->
+  <script type="text/javascript">
+var sources = new DiseaseSearch("https://beta.openphacts.org/2.1", "91f5d4d0", "1af5086da757e57c553bfa1351708d5f");
+var sourcesMap = new MapSearch("https://beta.openphacts.org/2.1", "91f5d4d0", "1af5086da757e57c553bfa1351708d5f");
+var DrugSources = new CompoundSearch("https://beta.openphacts.org/2.1", "91f5d4d0", "1af5086da757e57c553bfa1351708d5f");
+var arrayOfDiseaseTargetsMapped = new Array(10); // initialize array outside callback so it may be used in different functions
+var arrayOfDrugTargetsMapped = new Array(10); // initialize array outside callback so it may be used in different functions
+var diseaseMappingCount = 0; // intialize variable that will keep track of how often callbackmap has ran
+var drugMappingCount = 0; // intialize variable that will keep track of how often callbackmapDrug has ran
+var callbackdone = 1;
+var callbackdone1 = 1; // intialize variable that will keep track whether the previous callback has finnised. Initialized at 1 so the first callack can always run.
+var obj = {"empty":"empty"};
+
+function sleep(ms) { // set sleep function that will enable us later to create an interval between calls to ensure we do not DDoS  the server
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+var callbackDisease = async function(success, status, response){ // in this function the disease targets are filtered from the call response, put into an array and mapped to finally store their uniprot identifiers in an array
+  if (success && status == 200) {
+    d3.select("#json2").html(JSON.stringify(response, undefined, 2));
+
+
+    var arrayOfDiseaseTargets = new Array(response.items.length);
+    arrayOfDiseaseTargetsMapped = Array(response.items.length);
+    console.log("Size of Array= " + arrayOfDiseaseTargets.length);
+    console.log("the length of 'arrayOfDiseaseTargetsMapped' is: " + arrayOfDiseaseTargetsMapped.length);
+  
+
+    for (var i = 0; i < response.items.length; i++) { // create array with all the disease targets
+      arrayOfDiseaseTargets[i] = response.items[i]._about;
+      }
+
+    for (var i = 0; i < response.items.length; i++) {// map the targets for uniprot and store them in new array
+      	await sleep(50);
+      	sourcesMap.mapURL(arrayOfDiseaseTargets[i], "http://identifiers.org/uniprot/", null, null, callbackMap);    		
+    }
+  }
+      
+  else {
+    d3.select("#json2").html("Error while calling the webservice: " + status);
+  }
+  DrugPharmacology(); // Initiate the Compoundpharmacology search for the drug
+};
+
+
+
+var callbackMap = function (success, status, response){
+
+
+  
+    if (success || status == 200) {
+      //d3.select("#json1").html(JSON.stringify(response, undefined, 2));
+
+
+      if (response.primaryTopic.exactMatch.constructor === Array){ // check if there are multiple URI's for the same target found
+        console.log("disease target " + diseaseMappingCount + " is of Array type")
+        arrayOfDiseaseTargetsMapped[diseaseMappingCount] = response.primaryTopic.exactMatch[1]; //if there are multiple URI for the same compound on the same database, we will only take the first into account
+        console.log("disease target " + diseaseMappingCount + " from callbackmap = " + arrayOfDiseaseTargetsMapped[diseaseMappingCount]);// print the chosen uniprot identifier to the console
+        diseaseMappingCount = diseaseMappingCount+1;// keep track of mapped identifiers
+
+      } else { // if only one URI found, proceed normally
+      arrayOfDiseaseTargetsMapped[diseaseMappingCount] = response.primaryTopic.exactMatch;
+      diseaseMappingCount = diseaseMappingCount+1;// keep track of mapped identifiers
+      console.log("disease target " + diseaseMappingCount + " from callbackmap = " + arrayOfDiseaseTargetsMapped[diseaseMappingCount - 1]);
+
+    }
+    
+    } else {
+      //d3.select("#json1").html("Error while calling the callbackMap webservice: " + status);
+      diseaseMappingCount = diseaseMappingCount+1;
+
+    }
+  }
+
+
+var callbackMapDrug = function (success, status, response){
+
+;
+  if (success || status == 200) {
+   // d3.select("#json4").html(JSON.stringify(response, undefined, 2));
+
+    if (response.primaryTopic.exactMatch.constructor === Array){ // check if there are multiple URI's for the same target found
+      console.log("drug target "+drugMappingCount+" is of Array type")
+      arrayOfDrugTargetsMapped[drugMappingCount] = response.primaryTopic.exactMatch[1];
+      drugMappingCount = drugMappingCount + 1;
+      console.log("drug target " + drugMappingCount + " from clalbackmap = " + arrayOfDrugTargetsMapped[drugMappingCount]);
+      
+  } else{ // if only one URI found, proceed normally
+      arrayOfDrugTargetsMapped[drugMappingCount] = response.primaryTopic.exactMatch;
+      drugMappingCount = drugMappingCount + 1;
+      console.log("drug target " + drugMappingCount + " from callbackmap = " + arrayOfDrugTargetsMapped[drugMappingCount - 1]);
+      
+    }
+  } else {
+    d3.select("#json4").html("Error while calling the callbackMapDrug webservice: " + status);
+    drugMappingCount = drugMappingCount + 1;
+    
+  }
+
+}
+
+var callbackDrug = async function(success, status, response){
+  if (success && status == 200) {
+   // d3.select("#json3").html(JSON.stringify(response, undefined, 2));
+
+    var Target1 = response.items[0].hasAssay.hasTarget._about;
+    
+    console.log("First Target: " + Target1);
+
+    Jsonlength = response.items.length; // set length for loop
+    list = response.items; // 
+    console.log("Number of drug targets: " + Jsonlength);
+    arrayOfDrugTargetsMapped = Array(Jsonlength);
+    var arrayOfDrugTargets = new Array(Jsonlength);
+        for (i=0; i<Jsonlength; i++) {
+          item = list[i];
+              arrayOfDrugTargets[i] = item.hasAssay["hasTarget"]._about;
+          }
+
+      for (var i = 0; i < Jsonlength; i++) {
+      	await sleep(50);
+        sourcesMap.mapURL(arrayOfDrugTargets[i], "http://identifiers.org/uniprot/", null, null, callbackMapDrug);
+    }
+
+  } else {
+    d3.select("#json3").html("Error while calling the webservice: " + status);
+  }
+  Comparison();
+};
+
+sources.targetsByDisease(
+  "http://linkedlifedata.com/resource/umls/id/C0010068",
+  null , "all", null, null, callbackDisease
+  );
+
+
+function DrugPharmacology(){
+DrugSources.compoundPharmacology(
+  "https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL1487",
+  null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, null, 'single_protein',
+  null, "all", null, null, callbackDrug
+);
+}
+
+
+var arrayOfOverlappingTargets = new Array; // initialize array that will contain the overlapping targets
+
+
+
+function Comparison (){
+console.log("before comparing the fifth drug map target is: " + arrayOfDrugTargetsMapped[5])
+	if (diseaseMappingCount == arrayOfDiseaseTargetsMapped.length){ // check if disease target mapping is finnished 
+	console.log("overlapping array is being made!")
+	for (var i = 0; i<arrayOfDiseaseTargetsMapped.length; i++){ // check for overlap in drug/disease targets
+	  for  (var j = 0; j<arrayOfDrugTargetsMapped.length; j++){
+	      console.log("looking for overlap");
+	      if (arrayOfDiseaseTargetsMapped[i] == arrayOfDrugTargetsMapped[j] && arrayOfDiseaseTargetsMapped[i]!=null){ // if targets overlap, put them in arrayOfOverlappingTargets and delete them from their 	previous array
+	        arrayOfOverlappingTargets.push(arrayOfDiseaseTargetsMapped[i]);
+	        arrayOfDiseaseTargetsMapped[i] = null;
+	        arrayOfDrugTargetsMapped[j] = null;
+  				}
+			}
+		}
+	}
+  console.log("after comparing the fifth drug map target is: " + arrayOfDrugTargetsMapped[5])
+	console.log("The Overlap array: " + arrayOfOverlappingTargets);
+	JSONcreate();
+}
+
+function JSONcreate(){ // build the javascripr object containing the required data tot visualize the results
+console.log("before JSONcreate the fifth drug map target is: " + arrayOfDrugTargetsMapped[5])
+console.log("The Overlap array: " + arrayOfOverlappingTargets + "with a total of " + arrayOfOverlappingTargets.length);
+
+  var D3data = '{"nodes":[{"name": "Coronary Heart Disease", "group": "Disease"},'; // intialize the object in the right format so we can extend it further
+    D3data = D3data + '{"name": "Lipitor", "group": "Drug"},';
+
+var name1 = "\"Disease Target"; 
+var name2 = "\"Drug Target";
+var name3 = "\"Overlapping Target";
+console.log("there should be " + arrayOfDiseaseTargetsMapped.length + " disease targets");
+
+
+  for (var i = 1; i <= arrayOfDiseaseTargetsMapped.length; i++){ // add all disease targets to obj
+
+    if (arrayOfDiseaseTargetsMapped[i] != null){
+      name1seq = name1 + i.toString();
+      D3data = D3data + '{"name": "' + arrayOfDiseaseTargetsMapped[i] + '","group": "Disease Target"},';
+      }
+    }
+console.log("before looping through DrugTargets the fifth drug map target is: " + arrayOfDrugTargetsMapped[5])
+  for (var z = 1; z <= arrayOfDrugTargetsMapped.length; z++){
+console.log("during the loop the fifth drug map target is: " + arrayOfDrugTargetsMapped[5]) // add all drug targets to obj
+console.log("A drug target should be added to JSON!") // DEBUGGING
+console.log(arrayOfDrugTargetsMapped[z])
+    if (arrayOfDrugTargetsMapped[z] != null){
+      console.log("And this target is not null")
+      name2seq = name2 + j.toString();
+      D3data = D3data + '{"name": "'+ arrayOfDrugTargetsMapped[z]+ '","group": "Drug Target"},';
+  } 
+}
+
+  for (var k = 1; k <= arrayOfOverlappingTargets.length; k++){ // add all overlapping targets to
+    name3seq = name3 + k.toString();
+    D3data = D3data + '{"name": "'+ arrayOfOverlappingTargets[k] + '","group": "Overlapping Target"},';
+  }
+    D3data = D3data.slice(0,D3data.length-1) // remove comma at the end
+    D3data = D3data + '],"links":[ ';
+
+    var name1 = "\"Disease Target";
+  var name2 = "\"Drug Target";
+  var name3 = "\"Overlapping Target";
+
+      for (var i = 1; i <= arrayOfDiseaseTargetsMapped.length; i++){
+      
+      if(arrayOfDiseaseTargetsMapped[i] != null){
+        D3data = D3data + '{"source": "' + arrayOfDiseaseTargetsMapped[i] + '","target": "Coronary Heart Disease", "count": 1},'; 
+      }
+    }
+  console.log("before creating drug target links, the drugtarget array looks as follow: " + arrayOfDrugTargetsMapped);
+
+  for (var j = 1; j <= arrayOfDrugTargetsMapped.length; j++){
+    if (arrayOfDrugTargetsMapped[i] != null){
+      console.log("adding drug target link")
+    D3data = D3data + '{"source": "' + arrayOfDrugTargetsMapped[j] + '","target": "Lipitor", "count": 1},';
+    } 
+  }
+
+  for (var k = 1; k <= arrayOfOverlappingTargets.length; k++){
+    D3data = D3data + '{"source": "' + arrayOfOverlappingTargets[k] + '","target": "Coronary Heart Disease", "count": 2},';
+    D3data = D3data + '{"source": "' + arrayOfOverlappingTargets[k] + '","target": "Lipitor", "count": 2},';
+  }
+      D3data = D3data.slice(0,D3data.length-1) // remove comma at the end
+    D3data = D3data + ']}';
+
+obj = JSON.parse(D3data); // create javascript object containing the formatted data for the visualization
+
+
+visualisation();
+}
+
+	var canvas = d3.select("#network"),
+  width = canvas.attr("width"),
+  height = canvas.attr("height"),
+  ctx = canvas.node().getContext("2d"),
+  r = 7,
+    color = d3.scaleOrdinal(d3.schemeCategory10),
+  simulation = d3.forceSimulation()
+    .force("x", d3.forceX(width/2))
+    .force("y", d3.forceY(height/2))
+    .force("collide", d3.forceCollide(r+1))
+    .force("charge", d3.forceManyBody()
+      .strength(-60))
+    .force("link", d3.forceLink()
+      .id(function (d) { return d.name; }));
+
+
+function visualisation(){
+	console.log("visualisation is initialized using the following json file: " );
+	//d3.select("#json5").html(JSON.stringify(obj),undefined ,2);
+	console.log(obj);
+    graph = obj; // load our data from obj into graph
+  simulation.nodes(graph.nodes);
+  simulation.force("link")
+    .links(graph.links);
+  simulation.on("tick", update);
+  canvas
+      .call(d3.drag()
+          .container(canvas.node())
+          .subject(dragsubject)
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended));
+
+  function update() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = "#aaa";
+    graph.links.forEach(drawLink);
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+    graph.nodes.forEach(drawNode);
+  }
+  function dragsubject() {
+    return simulation.find(d3.event.x, d3.event.y);
+  }
+
+
+};
+function dragstarted() {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+  d3.event.subject.fx = d3.event.subject.x;
+  d3.event.subject.fy = d3.event.subject.y;
+  console.log(d3.event.subject);
+  d3.select("#json1").html(JSON.stringify(d3.event.subject),undefined ,2);
+}
+function dragged() {
+  d3.event.subject.fx = d3.event.x;
+  d3.event.subject.fy = d3.event.y;
+}
+function dragended() {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d3.event.subject.fx = null;
+  d3.event.subject.fy = null;
+}
+function drawNode(d) {
+  ctx.beginPath();
+  ctx.fillStyle = color(d.group);
+  ctx.moveTo(d.x, d.y);
+  ctx.arc(d.x, d.y, r, 0, Math.PI*2);
+  ctx.fill();
+}
+function drawLink(l) {
+  ctx.moveTo(l.source.x, l.source.y);
+  ctx.lineTo(l.target.x, l.target.y);
+}
+
+</script>
+</body>
+</html>
+
